@@ -18,6 +18,7 @@ knitr::opts_chunk$set(
 library(tidyverse)
 library(pander)
 library(ngsReports)
+library(plotly)
 ```
 
 The following document has been set up to run all scripts used to generate the nine Kushen transcriptomes using `Trinity` and `Stringtie`. To begin analysis please create the directory structure required to run scripts. Download and place all scripts in the scripts directory and download the sequencing data into the fasta directory located in the 01_raw_data parent directory. Also download the draft genome into the KS_genome directory.
@@ -459,81 +460,176 @@ blaststats <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Protein_
 blaststats
 ```
 ### Species Dist.
+
 ```{r}
 A1 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_leaf30_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5) 
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "7431")
 
 A2 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_root30_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "18600")
 
 A3 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_stem30_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "7731")
 
 A4 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS30_trinity_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "21062")
 
 A5 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_trinity_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "20924")
 
 A6 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_trinity_hisat2_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "13621")
+
 
 A7 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_trinity_star_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "9476")
 
 A8 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_stringtie_star_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "8712")
 
 A9 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_stringtie_hisat_Species_count.txt") %>%
   separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
   mutate(Species=paste0(Genus, "_", species)) %>%
-  select(Count, Species) %>%
-  head(n=5)
+  select(Species, Count) %>%
+  head(n=5) %>%
+  add_row(Species = "Other", Count = "8283")
 
 A1$Count <- as.integer(as.character(A1$Count))
-A1 %>% pander()
 A2$Count <- as.integer(as.character(A2$Count))
-A2 %>% pander()
 A3$Count <- as.integer(as.character(A3$Count))
-A3 %>% pander()
 A4$Count <- as.integer(as.character(A4$Count))
-A4 %>% pander()
 A5$Count <- as.integer(as.character(A5$Count))
-A5 %>% pander()
 A6$Count <- as.integer(as.character(A6$Count))
-A6 %>% pander()
 A7$Count <- as.integer(as.character(A7$Count))
-A7 %>% pander()
 A8$Count <- as.integer(as.character(A8$Count))
-A8 %>% pander()
 A9$Count <- as.integer(as.character(A9$Count))
-A9 %>% pander()
+
+A1 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity Leaf 30<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+ 
+  
+A2 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#0072B2", "#D55E00", "#000000", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity Root 30<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A3 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity Stem 30<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A4 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#0072B2", "#D55E00", "#56B4E9", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity All Tissues 30<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A5 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#0072B2", "#D55E00", "#56B4E9", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity All Tissues 100<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A6 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity STAR<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A7 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#56B4E9", "#E69F00", "#009E73", "#F0E442", "#CC79A7"))) %>%
+  layout(title = '<b>Trinity HISAT2<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A8 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#CC79A7"))) %>%
+  layout(title = '<b>Stringtie STAR<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
+
+A9 %>% plot_ly(labels = ~Species, values = ~Count, 
+               type = 'pie',
+               textposition = 'outside',
+               textinfo = 'label+percent',
+               marker=list(colors=c("#999999", "#E69F00", "#009E73", "#F0E442", "#56B4E9", "#CC79A7"))) %>%
+  layout(title = '<b>Stringtie HISAT2<b>',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE)) %>%
+  layout(autosize = F, width = 800, height = 400, showlegend = FALSE) 
 
 ```
+
+
 
 
 
