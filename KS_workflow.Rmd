@@ -1,0 +1,539 @@
+---
+title: "Kushen Pipeline"
+author: "Alix Harlington"
+date: "10/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE, 
+    message = FALSE, 
+    warning = FALSE,
+    fig.align = "center"
+)
+```
+
+```{r pakages, include=FALSE}
+library(tidyverse)
+library(pander)
+library(ngsReports)
+```
+
+The following document has been set up to run all scripts used to generate the nine Kushen transcriptomes using `Trinity` and `Stringtie`. To begin analysis please create the directory structure required to run scripts. Download and place all scripts in the scripts directory and download the sequencing data into the fasta directory located in the 01_raw_data parent directory. Also download the draft genome into the KS_genome directory.
+
+## Directory Structure
+```7
+.
+├── KS_transcriptome
+   ├── 01_raw_data
+   │   ├── fasta
+   │   └── fastqc
+   │
+   ├── 02_trimmed_data
+   │   ├── fatsp_100
+   │   └── fastp_30
+   │
+   ├── 03_assembly
+   │
+   ├── 04_assembly_assessment
+   │   ├── blast
+   │   ├── bowtie
+   │   └── busco  
+   │
+   ├── 05_aligned_rnaseq_data
+   │   ├── HISAT2
+   │   └── STAR 
+   │
+   ├── KS_genome
+   │
+   ├── KS_genome_index
+   │
+   ├── scripts
+
+```
+## Packages
+The following packages were downloading using conda install into a conda environment. Use the following command to download all required packages.
+
+`conda install -c bioconda -c conda-forge samtools bowtie2 star fastqc bwa hisat2 busco augustus trimmomatic fastp blast star trinity gffutils `
+
+## FastQC Report
+Run FastQc on the raw data to assess quality. Script will only run if the raw data is downloaded in the correct directory. Please see script for comments. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./01_raw_fastqc.sh
+```
+
+## Data Trimming with Fastp
+The raw data was trimmed using fastp with the following settings --cut_right --cut_window_size 4 --cut_mean_quality 20 --length_required 30 for `02.1_fastp_trim30.sh` and --cut_right --cut_window_size 4 --cut_mean_quality 20 --length_required 100 for the script `02.4_fatsp_trim100.sh`.FastQC reports were generated for both trimmed data sets. Please see script for comments. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./02.1_fastp_trim30.sh
+#./02.4_fastp_trim100.sh
+```
+
+## _De novo_ Assembly using Trinity
+Scripts required to perform transcriptome assembly using Trinity. All the tissue specific data must be combined into one file for R1 and R2 using the cat command to run Trinity using all data combined. Please see script for comments. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/02_trimmed_data/fastp_30/trimmed_data
+#cat *R1.fq.gz > KS_LRS_fastp30_R1.fq.gz
+#cat *R2.fq.gz > KS_LRS_fastp30_R2.fq.gz
+#cd ~/KS_transcriptome/02_trimmed_data/fastp_100/trimmed_data
+#cat *R1.fq.gz > KS_LRS_fastp100_R1.fq.gz
+#cat *R2.fq.gz > KS_LRS_fastp100_R2.fq.gz
+
+#cd ~/KS_transcriptome/scripts
+#./03.1_Trinity.sh
+#./03.2_Trinity_100.sh
+```
+
+## BUSCO for _de novo_ Assemblies
+The following script runs BUSCO for all five _de novo_ assemblies made using `Trinity`. BUSCO was ran using default settings using the fabales_odb10 data set. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./04_busco_denovo.sh
+```
+
+# Genome Guided Assembly
+
+### Please ensure draft genome has been downloaded into KS_genome
+
+Genome-guided assemblies were produced using `Trinity` and `Stringtie`.
+
+## Trinity with STAR Aligner
+The following script performs indexing of the genome using `STAR` and aligns the reads to the draft genome using `STAR` with settings `--outSAMstrandField intronMotif` which writes the XS flag in the bam file and is needed for use in assembly and `--outSAMtype BAM SortedByCoordinate` to produce a sorted .bam file without using samtools. `Trinity` is ran in genome guided mode and `BUSCO` is run on the fasta file. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./05_genome_guided_trinity_star.sh
+```
+
+## Trinity with HISAT2 Aligner
+The following script performs indexing of the genome using `HISAT2` and aligns the reads to the draft genome using `HISAT2` with default settings and option --dta to be used for assembly. `Samtools sort` is used to sort the .bam file. `Trinity` is ran in genome guided mode using the sorted .bam file and `BUSCO` is run on the fasta file. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./06_genome_guided_trinity_hisat2.sh
+```
+
+## Stringtie with STAR and HISAT2 Aligner
+`Stringtie` is used to perform genome guided assembly. The .bam file generate by `STAR` and `HISAT2` from the previous two scripts is used by `stringtie` to do two assemblies. The output of `Stringtie` is a gtf file. `gffread` is used with the genome to convert the .gtf files to fasta format.`BUSCO` is ran on both resulting assemblies. Remove comment to run.
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./07_genome_guided_stringtie.sh
+```
+
+To continue please move all the assemblies into the following directory and name as below or name as you want. The blast and bowtie scripts require all assemblies are in this directory.
+
+```7
+.
+├── KS_transcriptome
+    └── 03_assembly
+        └── All_Fasta_Files
+            ├── KS_leaf30_trinity.fa
+            ├── KS_LRS100_stringtie_hisat.fa
+            ├── KS_LRS100_stringtie_star.fa
+            ├── KS_LRS100_trinity.fa
+            ├── KS_LRS30_trinity.fa
+            ├── KS_root30_trinity.fa
+            ├── KS_stem30_trinity.fa
+            ├── KS_trinity_hisat2.fa
+            └── KS_trinity_star.fa
+```
+# Assembly Assessment 
+BUSCO has already been ran in the previous scirpts. BLAST and BOWTIE2 are run in their own scripts.
+
+## BLAST Assessment
+The current release of the Swiss_prot database needs to be downloaded to run blast. Once downloaded the blast script cna be ran to make a blast database and run blast with the settings `-evalue 1e-20 -num_threads ${CPU} -max_target_seqs 1 -outfmt 6`. A perl script from the trinity pipeline then takes the blast output and determines the number of unique proiteins and the length match to each transcript.
+```{bash}
+#cd ~/KS_transcriptome/04_assembly_assessment/blast/swissprot
+#wget ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz
+
+#cd ~/KS_transcriptome/scripts
+#./08_blast.sh
+```
+
+## BOWTIE2 Assessment
+For each assembly `bowtie2` was run. Using all the reads from the trimmed min length 100 data the reads are aligned to each transcriptome. 
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#./09_bowtie.sh
+```
+# Plots and tabels
+
+### BUSCO Plot
+```{bash}
+#cd ~/KS_transcriptome/scripts
+#python3 scripts_generate_plot.py --working_directory ~/KS_transcriptome/04_assembly_assessment/busco/BUSCO_summaries
+```
+
+### Importing Blast Results
+```{r}
+blast1 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_leaf30_trinity_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly1 = count_in_bin,
+  ) %>%
+  select(bin, count_Assembly1)
+
+blast2 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_hisat_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly9 = count_in_bin,
+  ) %>%
+  select(count_Assembly9)
+
+blast3 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_star_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly8 = count_in_bin,
+  ) %>%
+  select(count_Assembly8)
+
+blast4 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_trinity_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly5 = count_in_bin,
+  ) %>%
+  select(count_Assembly5)
+
+blast5 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS30_trinity_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly4 = count_in_bin,
+  ) %>%
+  select(count_Assembly4)
+
+blast6 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_root30_trinity_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly2 = count_in_bin,
+  ) %>%
+  select(count_Assembly2)
+
+blast7 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_stem30_trinity_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly3 = count_in_bin,
+  ) %>%
+  select(count_Assembly3)
+
+blast8 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_hisat2_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly7 = count_in_bin,
+  ) %>%
+  select(count_Assembly7)
+
+blast9 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_star_blastx.outfmt6.hist") %>%
+  rename(
+    bin = `#hit_pct_cov_bin`,
+    count_Assembly6 = count_in_bin,
+  ) %>%
+  select(count_Assembly6)
+
+blast <- blast1 %>%
+  mutate(
+    blast2, 
+    blast3,
+    blast4,
+    blast5,
+    blast6,
+    blast7,
+    blast8,
+    blast9) %>%
+  pivot_longer(cols = starts_with("count"),
+   names_to = "Assembly",
+   values_to = "count")
+
+blast
+```
+
+### Plot BLAST results
+```{r plot_1}
+plot_1 <- blast %>%
+  ggplot(aes(x = bin, y = count, fill = Assembly)) +
+  geom_bar(stat ="identity", fill = "#56B4E9") +
+  geom_text(aes(label=count), 
+            vjust = -0.2, size = 3.1, fontface = "bold")+
+  labs(x = "% Protein Identity", y = "Transcript Count") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme_minimal() +
+  theme(panel.grid.major = element_blank()) +
+  theme(axis.text.x = element_text(size=9, color = "#000000"),
+          axis.text.y = element_text(size=9, color = "#000000")) +
+  theme(axis.text=element_text(size=16),
+        axis.title=element_text(size=16,face="bold")) +
+  theme(legend.position = "none", 
+        strip.text = element_text(size = 15))  +
+  facet_wrap(~Assembly,labeller = labeller(Assembly = 
+    c("count_Assembly1" = "Trinity leaf 30",
+      "count_Assembly2" = "Trinity Root 30",
+      "count_Assembly3" = "Trinity Stem 30",
+      "count_Assembly4" = "Trinity All Tissues 30",
+      "count_Assembly5" = "Trinity All Tissues 100",
+      "count_Assembly6" = "Trinity STAR",
+      "count_Assembly7" = "Trinity HISAT2",
+      "count_Assembly8" = "Stringtie STAR",
+      "count_Assembly9" = "Stringtie HISAT2")))
+plot_1
+
+ggsave(file="~/KS_transcriptome/Images/blastplot_1.png", plot=plot_1, width=12, height=9)
+```
+
+### FastQC Reports
+```{r}
+# fileDir1 <- file.path("~", "KS_transcriptome", "01_raw_data", "fastqc")
+# writeHtmlReport(fileDir1)
+# 
+# fileDir2 <- file.path("~", "KS_transcriptome", "02_trimmed_data", "fastp_30", "fastqc")
+# writeHtmlReport(fileDir2)
+# 
+# fileDir3 <- file.path("~", "KS_transcriptome", "02_trimmed_data", "fastp_100", "fastqc")
+# writeHtmlReport(fileDir3)
+```
+
+
+### STAR Results
+```{r}
+starLog <- file.path("~", "KS_transcriptome", "05_aligned_rnaseq_data", "STAR", "bam", "KS_LRS100.Log.final.out")
+df1 <- importNgsLogs(starLog, type = "star")
+
+plotdata1 <- df1 %>%
+  mutate(
+    Percent_Total = Total_Mapped_Percent,
+    Percent_Unique = Uniquely_Mapped_Reads_Percent,
+    Percent_Multi = Percent_Of_Reads_Mapped_To_Multiple_Loci
+  ) %>%
+  select(
+    Percent_Total,
+    Percent_Unique,
+    Percent_Multi
+  ) %>%
+  pander()
+
+plotdata1
+```
+
+### HISAT2 Results
+```{r}
+hisatLog <- file.path("~", "KS_transcriptome", "05_aligned_rnaseq_data", "HISAT2", "bam", "log.txt")
+df2 <- importNgsLogs(hisatLog, type = "hisat")
+
+plotdata2 <- df2 %>%
+  mutate(
+    Percent_Total = Alignment_Rate * 100,
+    Percent_Unique = ((Unique_In_Pairs * 2) + (Unique_Discordant_Pairs * 2) + Unique_Unpaired)/(Total_Reads * 2) * 100,
+    Percent_Multi = ((Multiple_In_Pairs * 2) + Multiple_Unpaired)/(Total_Reads * 2)* 100) %>%
+  select(
+    Percent_Total,
+    Percent_Unique,
+    Percent_Multi
+  ) %>%
+  pander()
+
+plotdata2
+```
+
+### Bowtie2 Results
+All clean fastp reads were aligned back to each transcriptome. An alignment for paired end reads of 80% or more is required for good assemblies. 
+
+### All Reads
+```{r}
+fls <- c("KS_leaf30_trinity_align_stats.txt", "KS_root30_trinity_align_stats.txt", "KS_stem30_trinity_align_stats.txt", "KS_LRS30_trinity_align_stats.txt", "KS_LRS100_trinity_align_stats.txt", "KS_trinity_star_align_stats.txt", "KS_trinity_hisat2_align_stats.txt", "KS_LRS100_stringtie_star_align_stats.txt", "KS_LRS100_stringtie_hisat_align_stats.txt")
+bowtieLogs <- file.path("~", "KS_transcriptome", "04_assembly_assessment", "bowtie", "alignments", fls)
+df3 <- importNgsLogs(bowtieLogs, type = "hisat")
+
+plotdata3 <- df3 %>%
+  mutate(
+    Assembly = c("Trinity leaf 30", "Trinity Root 30", "Trinity Stem 30", "Trinity All Tissues 30", "Trinity All Tissues 100", "Trinity Star 100", "Trinity Hisat 100", "Stringtie Star 100", "Stringtie Hisat 100"),
+    Percent_Total = Alignment_Rate * 100,
+    Percent_Unique = ((Unique_In_Pairs * 2) + (Unique_Discordant_Pairs * 2) + Unique_Unpaired)/(Total_Reads * 2) * 100,
+    Percent_Multi = ((Multiple_In_Pairs * 2) + Multiple_Unpaired)/(Total_Reads * 2)* 100) %>%
+  select(
+    Assembly,
+    Percent_Total,
+    Percent_Unique,
+    Percent_Multi
+  ) 
+
+plotdata3 %>%
+  pander()
+```
+### PE Reads
+```{r}
+plotdata3 <- df3 %>%
+  mutate(
+    Assembly = c("Trinity leaf 30", "Trinity Root 30", "Trinity Stem 30", "Trinity All Tissues 30", "Trinity All Tissues 100", "Trinity Star 100", "Trinity Hisat 100", "Stringtie Star 100", "Stringtie Hisat 100"),
+    Percent_Unique = (Unique_In_Pairs * 2)/(Total_Reads * 2) * 100,
+    Percent_Multi = (Multiple_In_Pairs * 2) /(Total_Reads * 2)* 100,
+    Percent_Total = Percent_Unique + Percent_Multi) %>%
+  select(
+    Assembly,
+    Percent_Total,
+    Percent_Unique,
+    Percent_Multi
+  ) 
+
+plotdata3 %>%
+  pander()
+```
+### BLAST Species Distribution
+The following code generates .tsv files listing all the species names from each blast hit. 
+```{r}
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_leaf30_trinity_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_leaf30.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_hisat_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_hisat.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_star_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_stringtie_star.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_trinity_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS100_trinity.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS30_trinity_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_LRS30_trinity.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_root30_trinity_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_root30.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_stem30_trinity_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_stem30.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_hisat2_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_hisat2.tsv")
+
+read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_star_blastx.outfmt6.w_pct_hit_length") %>%
+  select(hit_descr) %>%
+  separate(hit_descr, into = c("col_1", "col_2"), sep = "OS=") %>%
+  select(col_2) %>%
+  separate(col_2, into = c("#Species"), sep = "OX=") %>%
+  write_tsv("~/KS_transcriptome/04_assembly_assessment/blast/blastout/KS_trinity_star.tsv")
+```
+
+The following script counts and tallies the species for each blast result using th e.tsv files created above for all nine assemblies. It also creates a table showing information about the total blast hits, unique blast hits per transcript and number of unique proteins.
+```{bash}
+cd ~/KS_transcriptome/scripts
+./10_blast_count.sh
+```
+
+```{r}
+blaststats <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Protein_count/Protein_count.tsv") %>%
+  mutate(
+    Percent_Unique_Blast_Hits = Unique_Blast_Hits/Total_Transcripts * 100,
+    Percent_Novel_Redundant = 100 - Percent_Unique_Blast_Hits
+  ) %>%
+  pander()
+blaststats
+```
+### Species Dist.
+```{r}
+A1 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_leaf30_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5) 
+
+A2 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_root30_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A3 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_stem30_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A4 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS30_trinity_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A5 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_trinity_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A6 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_trinity_hisat2_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A7 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_trinity_star_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A8 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_stringtie_star_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A9 <- read_tsv("~/KS_transcriptome/04_assembly_assessment/blast/Species_count/KS_LRS100_stringtie_hisat_Species_count.txt") %>%
+  separate(`#`, into = c("Count", "Genus", "species"), sep = " ") %>%
+  mutate(Species=paste0(Genus, "_", species)) %>%
+  select(Count, Species) %>%
+  head(n=5)
+
+A1$Count <- as.integer(as.character(A1$Count))
+A1 %>% pander()
+A2$Count <- as.integer(as.character(A2$Count))
+A2 %>% pander()
+A3$Count <- as.integer(as.character(A3$Count))
+A3 %>% pander()
+A4$Count <- as.integer(as.character(A4$Count))
+A4 %>% pander()
+A5$Count <- as.integer(as.character(A5$Count))
+A5 %>% pander()
+A6$Count <- as.integer(as.character(A6$Count))
+A6 %>% pander()
+A7$Count <- as.integer(as.character(A7$Count))
+A7 %>% pander()
+A8$Count <- as.integer(as.character(A8$Count))
+A8 %>% pander()
+A9$Count <- as.integer(as.character(A9$Count))
+A9 %>% pander()
+
+```
+
+
+
